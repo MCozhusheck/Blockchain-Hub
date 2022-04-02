@@ -12,8 +12,6 @@ describe("FlashLoan contract", function () {
     FlashLoanContract = await ethers.getContractFactory("FlashLoan");
     TokenContract = await ethers.getContractFactory("TokenA");
     [owner, user] = await ethers.getSigners();
-    owner = owner;
-    user = user;
     token = await TokenContract.deploy("1000000000");
     flashLoan = await FlashLoanContract.deploy(token.address, 1000);
     await token.transfer(flashLoan.address, 1000);
