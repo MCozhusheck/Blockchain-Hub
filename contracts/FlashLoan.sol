@@ -1,4 +1,5 @@
 pragma solidity ^0.8.0;
+import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
@@ -8,10 +9,10 @@ contract FlashLoan {
     uint256 private maxAmount;
     bool internal locked;
 
-    constructor(address newToken, uint256 newMaxAmount) {
+    constructor(address _token, uint256 _maxAmount) {
         owner = msg.sender;
-        maxAmount = newMaxAmount;
-        token = newToken;
+        maxAmount = _maxAmount;
+        token = _token;
     }
 
     modifier isOwner() {
