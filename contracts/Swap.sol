@@ -7,33 +7,35 @@ contract Swap {
     address private owner;
     address private tokenA;
     address private tokenB;
-    uint256 public price;
+    uint256 public priceExponent;
+    int256 public mantissa;
     modifier isOwner() {
         require(msg.sender == owner, "Caller is not owner");
         _;
     }
 
     event Deposit(address indexed from, uint256 value);
-    event Exchange(
-        address indexed from,
-        address token,
-        uint256 value,
-        uint256 price
-    );
+    event Exchange(address indexed from, address token, uint256 value);
 
     constructor(
         address firstToken,
         address secondToken,
-        uint256 newPrice
+        uint256 _priceExponent,
+        int256 _mantissa
     ) {
         owner = msg.sender;
-        price = newPrice;
         tokenA = firstToken;
         tokenB = secondToken;
+        priceExponent = _priceExponent;
+        mantissa = _mantissa;
     }
 
-    function updatePrice(uint256 newPrice) public isOwner {
-        price = newPrice;
+    function updatePrice(uint256 _priceExponent, int256 _mantissa)
+        public
+        isOwner
+    {
+        priceExponent = _priceExponent;
+        mantissa = _mantissa;
     }
 
     function deposit(address tokenAddress, uint256 amount) public isOwner {
@@ -41,25 +43,43 @@ contract Swap {
         emit Deposit(msg.sender, amount);
     }
 
+    function absVal(int256 integer) private returns (uint256) {
+        return uint256(integer < 0 ? -integer : integer);
+    }
+
     function exchange(address tokenAddress, uint256 amount) public {
+        uint256 price;
+        uint256 totalAmount;
+        address boughtToken;
+        address soldToken;
         if (tokenAddress == tokenA) {
-            uint256 totalAmount = SafeMath.mul(amount, price);
-            require(
-                totalAmount < ERC20(tokenB).balanceOf(address(this)),
-                "Not enought tokens to exchange"
-            );
-            ERC20(tokenA).transferFrom(msg.sender, address(this), amount);
-            ERC20(tokenB).transfer(msg.sender, totalAmount);
-            emit Exchange(msg.sender, tokenA, amount, price);
+            boughtToken = tokenA;
+            soldToken = tokenB;
+            price = SafeMath.mul(priceExponent, amount);
+            if (mantissa >= 0) {
+                totalAmount = SafeMath.mul(price, 10**absVal(mantissa));
+            } else {
+                totalAmount = SafeMath.div(price, 10**absVal(mantissa));
+            }
         } else if (tokenAddress == tokenB) {
-            uint256 totalAmount = SafeMath.div(amount, price);
-            require(
-                totalAmount < ERC20(tokenA).balanceOf(address(this)),
-                "Not enought tokens to exchange"
-            );
-            ERC20(tokenB).transferFrom(msg.sender, address(this), amount);
-            ERC20(tokenA).transfer(msg.sender, totalAmount);
-            emit Exchange(msg.sender, tokenB, amount, price);
+            boughtToken = tokenB;
+            soldToken = tokenA;
+            price = SafeMath.div(amount, priceExponent);
+            if (mantissa >= 0) {
+                totalAmount = SafeMath.mul(price, 10**absVal(mantissa));
+            } else {
+                totalAmount = SafeMath.div(price, 10**absVal(mantissa));
+            }
+        } else {
+            revert("Invalid token address");
         }
+        require(
+            totalAmount <= ERC20(soldToken).balanceOf(address(this)),
+            "Too much tokens to exchange"
+        );
+        require(totalAmount > 0, "Too little tokens to exchange");
+        ERC20(boughtToken).transferFrom(msg.sender, address(this), totalAmount);
+        ERC20(soldToken).transfer(msg.sender, amount);
+        emit Exchange(msg.sender, boughtToken, totalAmount);
     }
 }
